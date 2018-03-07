@@ -5,19 +5,19 @@ The ProxySQL Admin (proxysql-admin) solution configures Percona XtraDB cluster n
 
 https://github.com/percona/proxysql-admin-tool
 
-fault tolerans for write hostgroup,
-first node is write node.and all nodes are read node.
-when first node is down , second node is write node 
-when second node is down , third node is write/read node ,
-if hostgroup is down , all related rules are made as passive
-and 
-if hostgroup is open , all related rules are made as active
+fault tolerans for write hostgroup,</b>
+first node is write node.and all nodes are read node.</b>
+when first node is down , second node is write node </b>
+when second node is down , third node is write/read node ,</b>
+if hostgroup is down , all related rules are made as passive</b>
+and </b>
+if hostgroup is open , all related rules are made as active</b>
  
 
-mysql> 
 ```
 
-delete from  mysql_servers;
+ delete from  mysql_servers;
+
  INSERT INTO mysql_servers(hostgroup_id, hostname, port,max_connections,comment) VALUES (121,'10.145.172.21',3306,10000,'WRITE');
  INSERT INTO mysql_servers(hostgroup_id, hostname, port,max_connections,comment) VALUES (122,'10.145.172.22',3306,10000,'WRITE');
  INSERT INTO mysql_servers(hostgroup_id, hostname, port,max_connections,comment) VALUES (123,'10.145.172.23',3306,10000,'WRITE');
