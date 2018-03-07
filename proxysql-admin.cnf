@@ -28,3 +28,8 @@ export MODE="singlewrite"
 
 # ProxySQL Cluster Node Priority File
 export HOST_PRIORITY_FILE=$PROXYSQL_DATADIR/host_priority.conf
+
+#When 1, update apply status of rules by state of servers in hostgroup
+#                                          minumum one server of all hosts state is not  ONLINE ,change apply state of rules so 
+#                                          rules is not active  
+export PROXYSQL_UPDATE_RULE=1

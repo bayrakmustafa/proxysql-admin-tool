@@ -17,7 +17,7 @@ function usage()
 {
   cat << EOF
 
-Usage: $0 <hostgroup_id write> [hostgroup_id read] [number writers] [writers are readers 0|1] [log_file]
+Usage: $0 <hostgroup_id write> [hostgroup_id read] [number writers] [writers are readers 0|1] [update rules 0|1] [log_file]
 
 - HOSTGROUP WRITERS   (required)  (0..)   The hostgroup_id that contains nodes that will server 'writes'
 - HOSTGROUP READERS   (optional)  (0..)   The hostgroup_id that contains nodes that will server 'reads'
@@ -42,6 +42,13 @@ to find nodes wsrep_local_state=4 (SYNCED) or wsrep_local_state=2 (DONOR/DESYNC)
 
 This is to avoid $0 to mark all nodes as OFFLINE_SOFT
 
+NOTE : 
+    UPDATE_RULES (in proxysql-admin.cnf)  
+       (optional)  (0|1)   When 1, update apply status of rules by state of servers in hostgroup
+                 minumum one server of all hosts state is not  ONLINE ,change apply state of rules so 
+                 rules is not active  
+
+
 EOF
 }
 
@@ -53,6 +60,13 @@ NUMBER_WRITERS="${3:-0}"
 WRITER_IS_READER="${4:-1}"
 ERR_FILE="${5:-/dev/null}"
 RELOAD_CHECK_FILE="${PROXYSQL_DATADIR}/reload"
+
+if [[ -z "$PROXYSQL_UPDATE_RULE" ]]; then
+  UPDATE_RULE=0
+else
+  UPDATE_RULE=$PROXYSQL_UPDATE_RULE
+fi
+
 
 echo "0" > ${RELOAD_CHECK_FILE}
 
@@ -70,7 +84,7 @@ proxysql_exec() {
   printf "%s\n" \
       "[client]" \
       "user=${PROXYSQL_USERNAME}" \
-      "password=${PROXYSQL_PASSWORD}" \
+      "password=\"${PROXYSQL_PASSWORD}\"" \
       "host=${PROXYSQL_HOSTNAME}" \
       "port=${PROXYSQL_PORT}"  \
       | mysql --defaults-file=/dev/stdin --protocol=tcp -Nse "${query}"
@@ -151,12 +165,30 @@ MYSQL_PASSWORD=$(echo $MYSQL_CREDENTIALS | awk '{print $2}')
 function change_server_status() {
   echo "`date` Changing server $1:$2:$3 to status $4. Reason: $5" >> ${ERR_FILE}
   proxysql_exec "UPDATE mysql_servers set status = '$4' WHERE hostgroup_id = $1 AND hostname = '$2' AND port = $3;" 2>> ${ERR_FILE}
+  if [ $UPDATE_RULE -eq 1 ]; then
+
+     proxysql_exec "UPDATE mysql_servers set status = '$4' WHERE hostname = '$2';" 2>> ${ERR_FILE}
+     proxysql_exec "SELECT hostgroup_id,group_concat(status) FROM mysql_servers  group by hostgroup_id;"|while IFS=$'\t' read -r hostgroup_id status;
+     do
+        echo "`date` update rules for  Total : $total Hostgroup : $hostgroup_id" 2>> ${ERR_FILE}
+        total=$(echo -n "$status"|grep -c "ONLINE")
+        if [ $total -eq 0 ]; then
+           proxysql_exec "UPDATE mysql_query_rules set apply = '0' WHERE destination_hostgroup = $hostgroup_id;" 2>> ${ERR_FILE}
+        else
+           proxysql_exec "UPDATE mysql_query_rules set apply = '1' WHERE destination_hostgroup = $hostgroup_id;" 2>> ${ERR_FILE}
+        fi
+            
+     done
+     proxysql_exec "LOAD MYSQL QUERY RULES TO RUNTIME;" 2>> ${ERR_FILE}
+     proxysql_exec "LOAD MYSQL SERVERS TO RUNTIME;" 2>> ${ERR_FILE}
+
+  fi
 }
 
 
 echo "`date` ###### HANDLE WRITER NODES ######" >> ${ERR_FILE}
 NUMBER_WRITERS_ONLINE=0
-proxysql_exec "SELECT hostgroup_id, hostname, port, status FROM mysql_servers WHERE hostgroup_id IN ($HOSTGROUP_WRITER_ID) AND status <> 'OFFLINE_HARD' AND comment <> 'SLAVEREAD' ORDER BY hostgroup_id, weight DESC, hostname, port" | while read hostgroup server port stat
+proxysql_exec "SELECT hostgroup_id, hostname, port, status FROM mysql_servers WHERE hostgroup_id in ($HOSTGROUP_WRITER_ID) AND status <> 'OFFLINE_HARD' AND comment <> 'SLAVEREAD' ORDER BY hostgroup_id, weight DESC, hostname, port" | while read hostgroup server port stat
 do
   WSREP_STATUS=$(mysql_exec "SHOW STATUS LIKE 'wsrep_local_state'" 2>>${ERR_FILE}| tail -1 2>>${ERR_FILE})
   PXC_MAIN_MODE=$(mysql_exec "SHOW VARIABLES LIKE 'pxc_maint_mode'" 2>>${ERR_FILE} | tail -1 2>>${ERR_FILE})
