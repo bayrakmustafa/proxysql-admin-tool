@@ -5,13 +5,13 @@ The ProxySQL Admin (proxysql-admin) solution configures Percona XtraDB cluster n
 
 https://github.com/percona/proxysql-admin-tool
 
-fault tolerans for write hostgroup,</b>
-first node is write node.and all nodes are read node.<b>
-when first node is down , second node is write node <b>
-when second node is down , third node is write/read node ,</b>
-if hostgroup is down , all related rules are made as passive</b>
-and </b>
-if hostgroup is open , all related rules are made as active</b>
+fault tolerans for write hostgroup,</br>
+first node is write node.and all nodes are read node.</br>
+when first node is down , second node is write node </br>
+when second node is down , third node is write/read node ,</br>
+if hostgroup is down , all related rules are made as passive</br>
+and </br>
+if hostgroup is open , all related rules are made as active</br>
  
 
 ```
